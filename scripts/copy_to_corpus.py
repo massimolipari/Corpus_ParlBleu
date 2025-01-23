@@ -3,11 +3,10 @@ import shutil
 
 input_grid_dir = '../corpus/exp/align'
 input_wav_dir = '../corpus/exp/segm'
-output_dir = '../test'
+output_dir = '../align'
 
 # Get list of speakers
 speakers = [s for s in os.listdir(input_grid_dir) if os.path.isdir(os.path.join(input_grid_dir, s))]
-print(speakers)
 
 for speaker in speakers:
     # Create the folder in the destination if it doesn't already exist
