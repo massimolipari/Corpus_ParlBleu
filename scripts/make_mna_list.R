@@ -5,7 +5,7 @@ library(tidygeocoder)
 # Make MNA list from legislatures.xlsx ------------------------------------
 
 # Set the path for the legislatures.xlsx file
-legislatures_path <- '../meta/legislatures.xlsx'
+legislatures_path <- './meta/legislatures.xlsx'
 
 # Get the list of sheets
 legislatures <- excel_sheets(legislatures_path)
@@ -21,7 +21,7 @@ for (legislature in legislatures){
 
 # Save as a CSV
 mna %>% 
-  write_csv('../meta/legislatures.csv', na = '')
+  write_csv('./meta/legislatures.csv', na = '')
 
 # Create unique, anonymous speaker IDs ------------------------------------
 
@@ -50,7 +50,7 @@ sameify <- function(string) {
 }
 
 # Read MNA list
-mna <- read_csv('../meta/legislatures.csv')
+mna <- read_csv('./meta/legislatures.csv')
 
 # Get unique MNA list, assuming no homonyms
 mna_unique <- mna %>% 
@@ -71,7 +71,7 @@ mna_unique_id <- cbind(mna_unique, id) %>%
   relocate(id)
 
 # Merge in original IDs
-original_ids <- read_csv('../meta/original/SpeakerList_fixed.csv', col_names = c('first', 'last', 'id_original')) %>% 
+original_ids <- read_csv('./meta/original/SpeakerList_fixed.csv', col_names = c('first', 'last', 'id_original')) %>% 
   mutate(name = paste(first, last), .after = last)
 
 mna_original_id <- mna_unique_id %>%
@@ -79,7 +79,7 @@ mna_original_id <- mna_unique_id %>%
   arrange(nom %>% sameify(), prénom %>% sameify(), nom, prénom)
 
 # Save as CSV
-mna_original_id %>% write_csv('../meta/id.csv', na = '')
+mna_original_id %>% write_csv('./meta/id.csv', na = '')
 
 
 # Create a template biographies CSV ---------------------------------------
@@ -94,13 +94,13 @@ mna_temp <- mna_unique_id %>%
          code = NA)
 
 # Save this list, into which biogrpahical data will be manually entered
-mna_temp %>% write_csv('../meta/bios_temp.csv', na = '')
+mna_temp %>% write_csv('./meta/bios_temp.csv', na = '')
 
 
 # Add geographic information ----------------------------------------------
 
 # Read in bios file
-bios <- read_csv('../meta/bios_man.csv')
+bios <- read_csv('./meta/bios_man.csv')
 
 # Get list of unique locations
 locales <- bios %>% 
@@ -148,7 +148,7 @@ locales_osm_cleaned <- locales_osm %>%
   select(-c(lat_fallback, long_fallback))
 
 # Write locales to a file
-locales_osm_cleaned %>% write_csv('../meta/locales.csv', na = '')
+locales_osm_cleaned %>% write_csv('./meta/locales.csv', na = '')
 
 
 # Merge biographical data with IDs and geographic info --------------------
@@ -160,13 +160,13 @@ mna_bios <- mna_unique_id %>%
           nom,
           prénom)
 
-mna_bios %>% write_csv('../meta/bios.csv', na = '')
+mna_bios %>% write_csv('./meta/bios.csv', na = '')
 
 
 mna_bios_locales <- mna_bios %>% 
   left_join(locales_osm_cleaned, by = c('municipalité', 'région', 'lieu'))
 
-mna_bios_locales %>% write_csv('../meta/bios_loc.csv', na = '')
+mna_bios_locales %>% write_csv('./meta/bios_loc.csv', na = '')
 
 
 # Create a version compatible with PGDB for current corpus version --------
@@ -174,7 +174,7 @@ mna_bios_locales %>% write_csv('../meta/bios_loc.csv', na = '')
 mna_bios_pgdb <- mna_bios %>% 
   relocate(ID_column = id)
   
-mna_bios_pgdb %>% write_csv('../meta/bios_pgdb.csv', na = '')
+mna_bios_pgdb %>% write_csv('./meta/bios_pgdb.csv', na = '')
 
 
 # Sanity checks -----------------------------------------------------------

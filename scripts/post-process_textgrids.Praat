@@ -4,8 +4,10 @@ folders = Create Strings as folder list: "folders", dir$
 n_folders = Get number of strings
 
 # Get words to change
-un_words = Read Strings from raw text file: "../etc/un.txt"
-n_un_words = Get number of strings
+un_words = Read Table from comma-separated file: "../etc/un.csv"
+e3_words = Read Table from comma-separated file: "../etc/3.csv"
+ah_words = Read Table from comma-separated file: "../etc/ah.csv"
+
 
 for i to n_folders
 	selectObject: folders
@@ -28,74 +30,122 @@ for i to n_folders
 		for k to n_phones
 			selectObject: grid
 
-			# Get the label, check if it's ein
+			# Get the label
 			phone_label$ = Get label of interval: 2, k
 
-			# Step 1: correct "w a" to "wa"
-			if phone_label$ == "w"
-				phone_end = Get end time of interval: 2, k
-				next_phone$ = Get label of interval: 2, k + 1
-
-				if next_phone$ == "a"
-					# Check that the next phone is still in the same word
-					word_interval = Get low interval at time: 1, phone_end
-					word_end = Get end time of interval: 1, word_interval
-
-					if phone_end <> word_end
-						Remove right boundary: 2, k
-						k = k - 1 # Decrement the counter because an interval was removed
-					endif
-				endif
-			endif
-
-			# Step 2: Change /ɛ̃/ to /œ̃/ as needed
-			if phone_label == "ɛ̃"
-				phone_start = Get start time of interval: 2, k
-				word_interval = Get interval at time: 1, phone_start
-				word_label$ = Get label of interval: 1, word_interval
-
-				word_start = Get start time of interval: 1, word_interval
-				word_end = Get end time of interval: 1, word_interval
-
-				first_phone = Get high interval at time: 2, word_start
-				last_phone = Get low interval at time: 2, word_end
-
-				phone_index_in_word = k - first_phone + 1
-
-				transcription$ = ""
-				for l from first_phone to last_phone
-					l_label$ = Get label of interval: 2, l
-					transcription$ = transcription$ + j_label$
-				endfor
+			# Step 1: Change /ɛ̃/ to /œ̃/ as needed
+			if phone_label$ == "ɛ̃"
+				@get_transcription: k
 
 				selectObject: un_words
-				word_row = List row numbers where: self$[row, "word"]=word_label$ & self$[row, "transcription"]=transcription$ & self[row, "index"]=phone_index_in_word
+				word_row = Extract rows where: "self$[""word""]=word_label$ & self$[""transcription""]=transcription$ & self[""index""]=phone_index_in_word"
 
-				fix = Get value: word_row, "fix"
+				is_in_table = Get number of rows
+				if is_in_table == 1
+					fix = Get value: 1, "round"
 
-				if fix == 1
-					selectObject: grid
-					Set interval text: 2, k, "œ̃" 
+					if fix == 1
+						selectObject: grid
+						Set interval text: 2, k, "œ̃"
+					endif
 				endif
+
+				selectObject: word_row
+				Remove
 			endif
 
-			# Step 3: Change /ɛ/ to /ɜ/ as needed
+			# Step 2: Change /ɛ/ to /ɜ/ as needed
+			selectObject: grid
+			if phone_label$ == "ɛ"
+				@get_transcription: k
 
-			# Step 4: Change /a/ to /ɑ/ as needed
+				selectObject: e3_words
+				word_row = Extract rows where: "self$[""word""]=word_label$ & self$[""transcription""]=transcription$ & self[""index""]=phone_index_in_word"
+
+				is_in_table = Get number of rows
+				if is_in_table == 1
+					fix = Get value: 1, "long"
+
+					if fix == 1
+						selectObject: grid
+						Set interval text: 2, k, "ɜ"
+					endif
+				endif
+
+				selectObject: word_row
+				Remove
+			endif
+
+			# Step 3: Change /a/ to /ɑ/ as needed
+			selectObject: grid
+			if phone_label$ == "a"
+				@get_transcription: k
+
+				selectObject: ah_words
+				word_row = Extract rows where: "self$[""word""]=word_label$ & self$[""transcription""]=transcription$ & self[""index""]=phone_index_in_word"
+
+				is_in_table = Get number of rows
+				if is_in_table == 1
+					fix = Get value: 1, "long"
+
+					if fix == 1
+						selectObject: grid
+						Set interval text: 2, k, "ɑ"
+					endif
+				endif
+
+				selectObject: word_row
+				Remove
+			endif
 
 		endfor
 
 		selectObject: grid
 		Save as text file: dir_temp$ + current_file$
 		Remove
-		
 	endfor
 
 	selectObject: files
 	Remove
-
 endfor
 
 selectObject: folders
 plusObject: un_words
+plusObject: e3_words
+plusObject: ah_words
 Remove
+
+procedure get_transcription: .phone
+	phone_start = Get start time of interval: 2, .phone
+	word_interval = Get interval at time: 1, phone_start
+	word_label$ = Get label of interval: 1, word_interval
+
+	word_start = Get start time of interval: 1, word_interval
+	word_end = Get end time of interval: 1, word_interval
+
+	first_phone = Get high interval at time: 2, word_start
+	last_phone = Get low interval at time: 2, word_end
+
+	phone_index_in_word = k - first_phone + 1
+
+	transcription$ = ""
+	for l from first_phone to last_phone
+		l_label$ = Get label of interval: 2, l
+
+		if l_label$ == "œ̃"
+			l_label$ = "ɛ̃"
+		endif
+
+		if l_label$ == "ɜ"
+			l_label$ = "ɛ"
+		endif
+
+		if l_label$ == "ɑ" and word_label$ <> "saaremaa"
+			l_label$ = "a"
+		endif
+
+		transcription$ = transcription$ + l_label$ + "."
+	endfor
+	
+	transcription$ = transcription$ - "."
+endproc

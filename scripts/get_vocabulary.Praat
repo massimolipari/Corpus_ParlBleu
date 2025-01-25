@@ -38,8 +38,10 @@ for i to n_folders
 				transcription$ = ""
 				for l from first_phone to last_phone
 					l_label$ = Get label of interval: 2, l
-					transcription$ = transcription$ + l_label$
+					transcription$ = transcription$ + l_label$ + "."
 				endfor
+
+				transcription$ = transcription$ - "."
 
                 appendFileLine: vocabulary_output$, word_label$ + tab$ + transcription$
             endif
