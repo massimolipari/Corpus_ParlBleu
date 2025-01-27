@@ -51,7 +51,7 @@ for i to n_row
     selectObject: sample
     Set numeric value: i, "ok", ok
     Set string value: i, "note", note$
-    Save as comma-separataed file: output_path$
+    Save as comma-separated file: output_path$
 
     # If there are already 50 ok tokens, skip to the next phone
     if ok_count >= 50
