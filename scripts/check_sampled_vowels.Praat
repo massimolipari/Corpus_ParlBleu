@@ -4,8 +4,8 @@ output_path$ = "../proto/vowels_sample_checked.csv"
 
 sample = Read Table from comma-separated file: sample_path$
 n_row = Get number of rows
-# Append column: "ok"
-# Append column: "note"
+Append column: "ok"
+Append column: "note"
 
 ok_count = 0
 
