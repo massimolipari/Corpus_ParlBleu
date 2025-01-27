@@ -21,7 +21,7 @@ vowels_sample_full <- vowels_sub %>%
 
 # Get the actual sample for prototypes
 vowels_sample <- vowels_sample_full %>% 
-  slice_head(n = 75,
+  slice_head(n = 100,
              by = c(genre, phone))
   
 # Drop the speaker info

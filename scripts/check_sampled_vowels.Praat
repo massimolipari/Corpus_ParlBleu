@@ -7,6 +7,8 @@ n_row = Get number of rows
 Append column: "ok"
 Append column: "note"
 
+ok_count = 0
+
 for i to n_row
     selectObject: sample
     speaker$ = Get value: i, "speaker"
@@ -29,10 +31,12 @@ for i to n_row
     editor: tg
         Zoom: phone_begin - 0.5, phone_end + 0.5
         Select: phone_begin, phone_end
+        Play: phone_begin, phone_end
     endeditor
 
     beginPause: "Check"
-        comment: "Phone: " + phone$
+        comment: "Row " + string$(i) + " of " + string$(n_row)
+        comment: "Phone: " + phone$ + " (" + string$(ok_count) + " of 50 ok)"
         comment: "Should this token be used?"
         text: "Note", ""
     annot = endPause: "Yes", "No", 1
@@ -41,11 +45,20 @@ for i to n_row
     plusObject: tg
     Remove
 
+    ok = 2 - annot
+    ok_count = ok_count + ok
+
     selectObject: sample
-    Set numeric value: i, "ok", 2 - annot
+    Set numeric value: i, "ok", ok
     Set string value: i, "note", note$
+    Save as comma-separataed file: output_path$
+
+    # If there are already 50 ok tokens, skip to the next phone
+    if ok_count >= 50
+        i = i + 100 - (i mod 100)
+        ok_count = 0
+    endif
 endfor
 
 selectObject: sample
-    Save as comma-separataed file: output_path$
-	Remove
+Remove
