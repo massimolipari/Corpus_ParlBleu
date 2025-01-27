@@ -1,15 +1,15 @@
 root_dir$ = "../align/"
-sample_path$ = "../proto/vowels_sample.csv"
+sample_path$ = "../proto/vowels_sample_checked.csv"
 output_path$ = "../proto/vowels_sample_checked.csv"
 
 sample = Read Table from comma-separated file: sample_path$
 n_row = Get number of rows
-Append column: "ok"
-Append column: "note"
+# Append column: "ok"
+# Append column: "note"
 
 ok_count = 0
 
-for i to n_row
+for i from 1701 to n_row
     selectObject: sample
     speaker$ = Get value: i, "speaker"
     speaker_dir$ = root_dir$ + speaker$ + "/"
