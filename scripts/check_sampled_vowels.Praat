@@ -9,7 +9,7 @@ n_row = Get number of rows
 
 ok_count = 0
 
-for i from 1701 to n_row
+for i to n_row
     selectObject: sample
     speaker$ = Get value: i, "speaker"
     speaker_dir$ = root_dir$ + speaker$ + "/"
