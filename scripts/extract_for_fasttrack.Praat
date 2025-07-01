@@ -29,14 +29,28 @@ for i to n_row
         discourse$ = Get value: i, "discourse"
         sound_path$ = speaker_dir$ + discourse$ + ".wav"
 
-        phone$ = Get value: 1, "phone"
+        phone$ = Get value: i, "phone"
         phone_begin = Get value: i, "phone_begin"
         phone_end = Get value: i, "phone_end"
         
         sound = Read from file: sound_path$
         Extract part: phone_begin - buffer, phone_end + buffer, "rectangular", 1, "no"
 
-        file_name$ = string$(i) + "_" + phone$ + "_" + discourse$ + ".wav"
+		i_with_zeros$ = string$(i)
+
+		if i < 1000
+			i_with_zeros$ = "0" + i_with_zeros$
+		endif
+
+		if i < 100
+			i_with_zeros$ = "0" + i_with_zeros$ 
+		endif
+
+		if i < 10
+			i_with_zeros$ = "0" + i_with_zeros$
+		endif
+
+        file_name$ = i_with_zeros$ + "_" + phone$ + "_" + discourse$ + ".wav"
         Save as WAV file: output_root$ + gender$ + "sounds/" + file_name$
 
         plusObject: sound

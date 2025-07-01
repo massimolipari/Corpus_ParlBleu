@@ -22,11 +22,11 @@ def main():
     arg_parser.add_argument('-d', '--dir', help = 'Corpus root directory.',
                             action = 'store', default = '../align')
     arg_parser.add_argument('-c', '--corpus', help = 'Corpus name.',
-                            action = 'store', default = 'AssNat')
+                            action = 'store', default = 'ParlBleu')
     arg_parser.add_argument('-y', '--yaml', help = 'Path to YAML file.',
                             action = 'store', default = '../meta/corpus_meta.yaml')
     arg_parser.add_argument('-p', '--procedure', help = 'What procedure(s) to perform.',
-                            action = 'extend', nargs = '+', choices = ['all', 'reset', 'import', 'phones', 'enrich', 'query_vowels'], default = [])
+                            action = 'extend', nargs = '+', choices = ['all', 'reset', 'import', 'phones', 'enrich', 'formants', 'query_vowels', 'query_vowel_formants', 'query_sibilants'], default = [])
     arg_parser.add_argument('-v', '--verbose', help = 'Set verbosity of output.',
                             action = 'store_true', default = True)
     
@@ -54,19 +54,20 @@ def main():
         enrich_corpus(args.corpus, args.dir, corpus_meta, args.verbose)
     else: logging.info('Enrichment option not selected, skipping...')
 
+    if 'formants' in args.procedure:
+        measure_formants(args.corpus, args.verbose)
+
     if 'query_vowels' in args.procedure:
         query_vowels(args.corpus, args.dir, args.verbose)
-    else: logging.info('Query option not selected, skipping...')
+    else: logging.info('Vowel query option (no formants) not selected, skipping...')
 
+    if 'query_vowel_formants' in args.procedure:
+        query_vowel_formants(args.corpus, args.dir, args.verbose)
+    else: logging.info('Vowel query option (formants) not selected, skipping...')
 
-
-    # if args.method in ['all', 'query_all']:
-    #     query_utterances(args.corpus, corpora[corpus], args.verbose)
-    #     query_sibilants(args.corpus, corpora[corpus], args.verbose)
-    # elif args.method == 'query_qf':
-    #     query_utterances(args.corpus, corpora[corpus], args.verbose)
-    #     query_sibilants_qf(args.corpus, corpora[corpus], args.verbose)
-    # else: logging.info('Querying option not selected, skipping...')
+    if 'query_sibilants' in args.procedure:
+        query_sibilants(args.corpus, args.dir, args.verbose)
+    else: logging.info('Sibilant query option (no acoustics) not selected, skipping...')
 
     logging.info(f'COMPLETED PROCESSING FOR CORPUS {args.corpus}.')
 
@@ -98,6 +99,12 @@ def summarize_phoneset(corpus_name):
 
 def enrich_corpus(corpus_name, corpus_root, meta, verbose):
     logging.info('Enriching...')
+
+    # Sibilant enrichment
+    if verbose:
+        logging.info(f'Creating sibilant subset...')
+    with CorpusContext(corpus_name) as c:
+        c.encode_type_subset('phone', meta['sibilants'], 'sibilant')
 
     # Vowel enrichment
     if verbose:
@@ -137,39 +144,55 @@ def enrich_corpus(corpus_name, corpus_root, meta, verbose):
         c.encode_rate('utterance', 'syllable', 'speech_rate')
         c.encode_count('word', 'syllable', 'num_syllables')
 
-# def query_utterances(corpus_name, corpus_root, verbose):
-#     logging.info('Querying utterances...')
-#     export_path = os.path.join(corpus_root, f'./data/{corpus_name}_utterances.csv')
+def measure_formants(corpus_name, verbose):
+    from polyglotdb.acoustics.formants.refined import analyze_formant_points_refinement
 
-#     with CorpusContext(corpus_name) as c:
-#         q = c.query_graph(c.utterance)
+    vowel_prototypes_path = '../meta/prototypes.csv'
+
+    with CorpusContext(corpus_name) as c:
+        c.config.praat_path = os.path.expanduser('~/praat')
+
+        logging.info("Refined formant calculations...")
+        analyze_formant_points_refinement(c,
+                                            duration_threshold = 0.05,
+                                            num_iterations = 20,
+                                            vowel_prototypes_path = vowel_prototypes_path,
+                                            drop_formant = False,
+                                            output_tracks = True)
+
+def query_utterances(corpus_name, corpus_root, verbose):
+    logging.info('Querying utterances...')
+    export_path = os.path.join(corpus_root, f'./data/{corpus_name}_utterances.csv')
+
+    with CorpusContext(corpus_name) as c:
+        q = c.query_graph(c.utterance)
         
-#         # Copied from the SPADE utterance extraction format (on GitHub: MontrealCorpusTools/SPADE/utterances.py)
-#         q = q.columns(c.utterance.speaker.name.column_name('speaker'),
-#                         c.utterance.id.column_name('utterance_label'),
-#                         c.utterance.begin.column_name('utterance_begin'),
-#                         c.utterance.end.column_name('utterance_end'),
-#                         c.utterance.following.begin.column_name('following_utterance_begin'),
-#                         c.utterance.following.end.column_name('following_utterance_end'),
-#                         c.utterance.speech_rate.column_name('speech_rate'),
-#                         c.utterance.discourse.name.column_name('discourse'),
-#                         c.utterance.discourse.speech_begin.column_name('discourse_begin'),
-#                         c.utterance.discourse.speech_end.column_name('discourse_end'),
-#                         )
+        # Copied from the SPADE utterance extraction format (on GitHub: MontrealCorpusTools/SPADE/utterances.py)
+        q = q.columns(c.utterance.speaker.name.column_name('speaker'),
+                        c.utterance.id.column_name('utterance_label'),
+                        c.utterance.begin.column_name('utterance_begin'),
+                        c.utterance.end.column_name('utterance_end'),
+                        c.utterance.following.begin.column_name('following_utterance_begin'),
+                        c.utterance.following.end.column_name('following_utterance_end'),
+                        c.utterance.speech_rate.column_name('speech_rate'),
+                        c.utterance.discourse.name.column_name('discourse'),
+                        c.utterance.discourse.speech_begin.column_name('discourse_begin'),
+                        c.utterance.discourse.speech_end.column_name('discourse_end'),
+                        )
 
-#         logging.info(f'Exporting full query to {export_path}...')
-#         q.to_csv(export_path)
+        logging.info(f'Exporting full query to {export_path}...')
+        q.to_csv(export_path)
 
 def query_vowels(corpus_name, corpus_root, verbose):
-    logging.info('Querying vowels...')
+    logging.info('Querying the corpus for all vowels (no formants)...')
     export_path = os.path.join(corpus_root, f'../extract/{corpus_name}_vowels.csv')
 
-    logging.info('Querying the corpus for all vowels (no formants)...')
-    # Get all sibilants
+    # Get all vowels
     with CorpusContext(corpus_name) as c:
 
         q = c.query_graph(c.phone)
         q.filter(c.phone.subset == 'vowel',
+                 c.phone.duration >= 0.05,
                  )
         
         q = q.columns(c.phone.discourse.name.column_name('discourse'),
@@ -189,53 +212,94 @@ def query_vowels(corpus_name, corpus_root, verbose):
                       c.phone.word.transcription.column_name('transcription'),
                       c.phone.syllable.word.begin.column_name('word_begin'),
                       c.phone.syllable.word.end.column_name('word_end'),
+                      c.phone.syllable.word.utterance.begin.column_name('utterance_begin'),
+                      c.phone.syllable.word.utterance.begin.column_name('utterance_end'),
+                      c.phone.syllable.word.utterance.speech_rate.column_name('utterance_speech_rate'),
                       )
 
-        print(f'Exporting full query to {export_path}...')
+        logging.info(f'Exporting full query to {export_path}...')
         q.to_csv(export_path)
 
-# def query_sibilants(corpus_name, corpus_root, verbose):
-#     logging.info('Querying sibilants...')
-#     export_path = os.path.join(corpus_root, f'./data/{corpus_name}_sibilants.csv')
+def query_vowel_formants(corpus_name, corpus_root, verbose):
+    logging.info('Querying the corpus for all vowels (with formants)...')
+    export_path = os.path.join(corpus_root, f'../extract/{corpus_name}_vowels.csv')
 
-#     logging.info('Querying the corpus for all (word-initial, pre-vocalic) sibilants...')
-#     # Get all sibilants
-#     with CorpusContext(corpus_name) as c:
+    # Get all vowels
+    with CorpusContext(corpus_name) as c:
 
-#         q = c.query_graph(c.phone)
-
-#         q.filter(c.phone.subset == 'sibilant',
-#                  c.phone.subset == 'fricative',
-#                  )
+        q = c.query_graph(c.phone)
+        q.filter(c.phone.subset == 'vowel',
+                 c.phone.duration >= 0.05,
+                 )
         
-#         q = q.columns(c.phone.discourse.name.column_name('discourse'),
-#                       c.phone.utterance.speaker.name.column_name('speaker'),
-#                       c.phone.utterance.speaker.nom_complet.column_name('speaker_name'),
-#                       c.phone.utterance.speaker.genre.column_name('gender'),
-#                       c.phone.utterance.speaker.annee_naissance.column_name('yob'),
-#                       c.phone.label.column_name('phone'),
-#                       c.phone.duration.column_name('phone_duration'),
-#                       c.phone.begin.column_name('phone_begin'),
-#                       c.phone.end.column_name('phone_end'),
-#                       c.phone.word.phone.position.column_name('phone_position'),
-#                       c.phone.previous.label.column_name('previous_phone'),
-#                       c.phone.following.label.column_name('following_phone'),
-#                       c.phone.following.following.label.column_name('following_following_phone'),
-#                       c.phone.syllable.label.column_name('syllable'),
-#                       c.phone.syllable.begin.column_name('syllable_begin'),
-#                       c.phone.syllable.end.column_name('syllable_end'),
-#                       c.phone.word.label.column_name('word'),
-#                       c.phone.word.transcription.column_name('transcription'),
-#                       c.phone.syllable.word.num_syllables.column_name('word_num_syllables'),
-#                       c.phone.syllable.word.begin.column_name('word_begin'),
-#                       c.phone.syllable.word.end.column_name('word_end'),
-#                       c.phone.syllable.word.utterance.begin.column_name('utterance_begin'),
-#                       c.phone.syllable.word.utterance.begin.column_name('utterance_end'),
-#                       c.phone.syllable.word.utterance.speech_rate.column_name('utterance_speech_rate'),
-#                       )
+        formants_prop = c.phone.formants
+        formants_prop.relative_time = True
+        formants_track = formants_prop.interpolated_track
+        formants_track.num_points = 21
+        
+        q = q.columns(c.phone.discourse.name.column_name('discourse'),
+                      c.phone.utterance.speaker.name.column_name('speaker'),
+                      c.phone.label.column_name('phone'),
+                      c.phone.duration.column_name('phone_duration'),
+                      c.phone.begin.column_name('phone_begin'),
+                      c.phone.end.column_name('phone_end'),
+                      c.phone.word.phone.position.column_name('phone_position'),
+                      c.phone.previous.label.column_name('previous_phone'),
+                      c.phone.following.label.column_name('following_phone'),
+                      c.phone.following.following.label.column_name('following_following_phone'),
+                      c.phone.syllable.label.column_name('syllable'),
+                      c.phone.syllable.begin.column_name('syllable_begin'),
+                      c.phone.syllable.end.column_name('syllable_end'),
+                      c.phone.word.label.column_name('word'),
+                      c.phone.word.transcription.column_name('transcription'),
+                      c.phone.syllable.word.begin.column_name('word_begin'),
+                      c.phone.syllable.word.end.column_name('word_end'),
+                      c.phone.syllable.word.utterance.begin.column_name('utterance_begin'),
+                      c.phone.syllable.word.utterance.begin.column_name('utterance_end'),
+                      c.phone.syllable.word.utterance.speech_rate.column_name('utterance_speech_rate'),
+                      formants_track
+                      )
 
-#         print(f'Exporting full query to {export_path}...')
-#         q.to_csv(export_path)
+        logging.info(f'Exporting full query to {export_path}...')
+        q.to_csv(export_path)
+
+def query_sibilants(corpus_name, corpus_root, verbose):
+    logging.info('Querying sibilants...')
+    export_path = os.path.join(corpus_root, f'./data/{corpus_name}_sibilants.csv')
+
+    logging.info('Querying the corpus for all sibilants...')
+    # Get all sibilants
+    with CorpusContext(corpus_name) as c:
+
+        q = c.query_graph(c.phone)
+
+        q.filter(c.phone.subset == 'sibilant',
+                 )
+        
+        q = q.columns(c.phone.discourse.name.column_name('discourse'),
+                      c.phone.utterance.speaker.name.column_name('speaker'),
+                      c.phone.label.column_name('phone'),
+                      c.phone.duration.column_name('phone_duration'),
+                      c.phone.begin.column_name('phone_begin'),
+                      c.phone.end.column_name('phone_end'),
+                      c.phone.word.phone.position.column_name('phone_position'),
+                      c.phone.previous.label.column_name('previous_phone'),
+                      c.phone.following.label.column_name('following_phone'),
+                      c.phone.following.following.label.column_name('following_following_phone'),
+                      c.phone.syllable.label.column_name('syllable'),
+                      c.phone.syllable.begin.column_name('syllable_begin'),
+                      c.phone.syllable.end.column_name('syllable_end'),
+                      c.phone.word.label.column_name('word'),
+                      c.phone.word.transcription.column_name('transcription'),
+                      c.phone.syllable.word.begin.column_name('word_begin'),
+                      c.phone.syllable.word.end.column_name('word_end'),
+                      c.phone.syllable.word.utterance.begin.column_name('utterance_begin'),
+                      c.phone.syllable.word.utterance.begin.column_name('utterance_end'),
+                      c.phone.syllable.word.utterance.speech_rate.column_name('utterance_speech_rate'),
+                      )
+
+        logging.info(f'Exporting full query to {export_path}...')
+        q.to_csv(export_path)
 
 if __name__ == '__main__':
     main()
