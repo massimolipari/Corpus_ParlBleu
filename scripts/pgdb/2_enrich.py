@@ -27,7 +27,7 @@ def main():
 
     print('Speaker enrichment...')
     # Change this if you've moved the file on your computer
-    speaker_enrichment_file = '../ParlBleu-subset/enrichment_data/speaker_metadata.csv'
+    speaker_enrichment_file = '../../meta/bios_pgdb.csv'
 
     with CorpusContext(corpus_name) as c:
         c.enrich_speakers_from_csv(speaker_enrichment_file)

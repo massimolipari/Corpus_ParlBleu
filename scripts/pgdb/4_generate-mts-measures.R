@@ -182,7 +182,7 @@ meanAmp <- function(x, minHz = min(freq(x)), maxHz = max(freq(x)), scale = 'dB',
 
 F_M <- function(one_window_spectrum, sibilant, gender) {
   F_M_ranges <- data.frame(sblnt = c('s', 's', 'ʃ', 'ʃ'),
-                           gndr = c('female', 'male', 'female', 'male'),
+                           gndr = c('f', 'm', 'f', 'm'),
                            min = c(3000, 3000, 2000, 2000),
                            max = c(8000, 7000, 4000, 4000))
 

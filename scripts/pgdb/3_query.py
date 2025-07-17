@@ -33,7 +33,7 @@ def main():
         ).columns(
             c.phone.discourse.name.column_name('discourse'),
             c.phone.utterance.speaker.name.column_name('speaker'),
-            c.phone.utterance.speaker.gender.column_name('gender'),
+            c.phone.utterance.speaker.genre.column_name('gender'),
             c.phone.label.column_name('phone'),
             c.phone.duration.column_name('phone_duration'),
             c.phone.begin.column_name('phone_begin'),
