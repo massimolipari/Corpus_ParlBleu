@@ -5,9 +5,9 @@ library(patchwork)
 
 theme_set(theme_bw())
 
-all_vowels <- read_csv('extract/ParlBleu_vowels.csv')
+all_vowels <- read_csv('./extract/ParlBleu_vowels.csv')
 
-bios <- read_csv('meta/bios.csv') %>% 
+bios <- read_csv('./meta/bios.csv') %>% 
   mutate(id = id %>% as.character())
 
 
@@ -26,7 +26,7 @@ yob_hist <- native %>%
        fill = 'Genre')
 
 yob_hist %>% 
-  ggsave('fig/yob_hist.png', ., device = 'png', width = 15.59, height = 5, units = 'cm')
+  ggsave('./LFDI 9/figures/hist.png', ., device = 'png', width = 15.59, height = 5, units = 'cm')
 
 
 # Figure 2 ----------------------------------------------------------------
@@ -35,7 +35,7 @@ qc_land <- readRDS('./etc/geo/qc_land.RDS')
 waters_trimmed <- readRDS('./etc/geo/waters.RDS')
 qc_boundaries <- readRDS('./etc/geo/qc_land.RDS')
 
-locales <- read_csv('meta/locales.csv')
+locales <- read_csv('./meta/locales.csv')
 
 data_locales <- data_duration %>% 
   filter(!(is.na(municipalité) | is.na(région))) %>% 
@@ -71,10 +71,8 @@ qc_map <- ggplot() +
         legend.key = element_blank(),
         legend.box = 'vertical')
 
-# c('#EE7733', '#0077BB', '#EE3377', '#CC3311', '#009988') c('#009988', '#CC3311', '#EE3377', '#0077BB', '#EE7733')
-
 qc_map %>% 
-  ggsave('fig/map.png', ., device = 'png', width = 15.59, height = 8, units = 'cm')
+  ggsave('./LFDI 9/figures/carte.png', ., device = 'png', width = 15.59, height = 8, units = 'cm')
 
 
 # Figure 3 ----------------------------------------------------------------
@@ -137,7 +135,7 @@ diff_plot <- check_measures_long %>%
 valid <- check_plot + diff_plot
 
 valid %>% 
-  ggsave('fig/valid.png', ., device = 'png', width = 15.59, height = 12, units = 'cm')
+  ggsave('./LFDI 9/figures/valid.png', ., device = 'png', width = 15.59, height = 12, units = 'cm')
 
 
 # Figure 4 ----------------------------------------------------------------
@@ -274,8 +272,10 @@ f1xf2 <- (f1xf2_short + f1xf2_long + f1xf2_nasal) +
   plot_layout(axes = 'collect')
 
 f1xf2 %>% 
-  ggsave('fig/f1xf2.png', ., device = 'png', width = 15.59, height = 10, units = 'cm')
+  ggsave('LFDI 9/figures/f1xf2.png', ., device = 'png', width = 15.59, height = 10, units = 'cm')
 
+
+# Figure 5 ----------------------------------------------------------------
 
 f3 <- gender_means %>% 
   filter(time == 0.5) %>% 
@@ -293,10 +293,10 @@ f3 <- gender_means %>%
              strip.position = 'right')
 
 f3 %>% 
-  ggsave('fig/f3.png', ., device = 'png', width = 15.59, height = 10, units = 'cm')
+  ggsave('./LFDI 9/figures/f3.png', ., device = 'png', width = 15.59, height = 10, units = 'cm')
 
 
-# Table 1 -----------------------------------------------------------------
+# Tableau 1 ---------------------------------------------------------------
 
 old_data <- read_csv('extract/AssNat_speech_breakdown.csv') %>% 
   rename(old_data = duration) %>% 
@@ -352,4 +352,4 @@ speaker_table <- data_duration %>%
   cols_align(columns = c(id, genre, annee_naissance), align = 'center')
 
 speaker_table %>% 
-  gtsave('./etc/figs/speakers.docx')
+  gtsave('./LFDI 9/figures/parlementaires.docx')
