@@ -1,72 +1,35 @@
 library(tidyverse)
 library(gt)
 library(sf)
+library(patchwork)
 
 theme_set(theme_bw())
 
-# Speaker table -----------------------------------------------------------
-
-old_data <- read_csv('extract/AssNat_speech_breakdown.csv') %>% 
-  rename(old_data = duration) %>% 
-  filter(speaker != '010') # Non-native speaker with < 2s of data, none of which was successfully aligned
-
-new_data <- read_csv('extract/exp_speech_breakdown.csv') %>% 
-  rename(new_data = duration) %>% 
-  mutate(speaker = speaker %>% as.character())
-
-ids <- read_csv('meta/id.csv') %>% 
-  mutate(id_original = id_original %>% { if_else(is.na(.), NA, sprintf('%03d', .)) } )
+all_vowels <- read_csv('extract/ParlBleu_vowels.csv')
 
 bios <- read_csv('meta/bios.csv') %>% 
   mutate(id = id %>% as.character())
 
-old_data <- old_data %>% 
-  left_join(ids, by = c('speaker' = 'id_original')) %>% 
-  summarize(old_data = sum(old_data),
-            .by = id) %>% 
-  mutate(id = id %>% as.character())
 
-data_duration <- old_data %>% 
-  full_join(new_data,
-            by = c('id' = 'speaker'))
+# Figure 1 ----------------------------------------------------------------
 
-data_duration <- data_duration %>% 
-  left_join(bios, by = 'id') %>% 
-  select(-c(`prénom`:nom_complet))
+native <- data_duration %>% 
+  filter(lieu == 'Québec')
 
-data_duration <- data_duration %>% 
-  relocate(old_data:new_data, .after = everything())
+yob_hist <- native %>% 
+  ggplot(aes(x = annee_naissance, fill = genre)) +
+  geom_histogram(binwidth = 1, colour = 'black', linewidth = 0.25) +
+  scale_fill_discrete(labels = c('Femmes', 'Hommes'), type = c('#EE3377', '#0077BB')) +
+  geom_vline(xintercept = median(native$annee_naissance, na.rm = TRUE), lty = 3) +
+  labs(x = 'Année de naissance',
+       y = 'Nombre de\nparlementaires',
+       fill = 'Genre')
 
-data_duration <- data_duration %>% 
-  arrange(is.na(old_data), annee_naissance, genre)
-
-speaker_table <- data_duration %>% 
-  select(-région) %>% 
-  gt(rowname_col = 'id') %>% 
-  tab_stubhead(label = 'Locutaire (code)') %>% 
-  cols_label(genre = 'Genre',
-             annee_naissance = 'Année de naissance',
-             municipalité = 'Lieu de naissance',
-             old_data = 'Corpus original',
-             new_data = 'Expansion') %>% 
-  tab_spanner(label = 'Quantité de données', columns = c(old_data, new_data)) %>% 
-  fmt(columns = genre, fns = toupper) %>% 
-  fmt_duration(columns = c(old_data, new_data), input_units = 'seconds', output_units = c('hours', 'minutes')) %>% 
-  grand_summary_rows(columns = c(old_data, new_data),
-                     fns = Total ~ sum(., na.rm = TRUE),
-                     missing_text = '',
-                     fmt = ~ fmt_duration(., input_units = 'seconds', output_units = c('hours', 'minutes'))) %>% 
-  cols_merge(columns = c(municipalité, lieu),
-             pattern = '{1} ({2})') %>% 
-  sub_missing(columns = c(annee_naissance, municipalité), missing_text = '?') %>% 
-  sub_missing(columns = c(old_data, new_data), missing_text = '—') %>% 
-  cols_align(columns = c(id, genre, annee_naissance), align = 'center')
-
-speaker_table %>% 
-  gtsave('./etc/figs/speakers.docx')
+yob_hist %>% 
+  ggsave('fig/yob_hist.png', ., device = 'png', width = 15.59, height = 5, units = 'cm')
 
 
-# Map ---------------------------------------------------------------------
+# Figure 2 ----------------------------------------------------------------
 
 qc_land <- readRDS('./etc/geo/qc_land.RDS')
 waters_trimmed <- readRDS('./etc/geo/waters.RDS')
@@ -114,29 +77,73 @@ qc_map %>%
   ggsave('fig/map.png', ., device = 'png', width = 15.59, height = 8, units = 'cm')
 
 
-# Histogram of birth years ------------------------------------------------
+# Figure 3 ----------------------------------------------------------------
 
-native <- data_duration %>% 
-  filter(lieu == 'Québec')
+iqr <- function(z, lower = 0.25, upper = 0.75) {
+  data.frame(
+    y = median(z),
+    ymin = quantile(z, lower),
+    ymax = quantile(z, upper)
+  )
+}
 
-yob_hist <- native %>% 
-  ggplot(aes(x = annee_naissance, fill = genre)) +
-  geom_histogram(binwidth = 1, colour = 'black', linewidth = 0.25) +
-  scale_fill_discrete(labels = c('Femmes', 'Hommes'), type = c('#EE3377', '#0077BB')) +
-  geom_vline(xintercept = median(native$annee_naissance, na.rm = TRUE), lty = 3) +
-  labs(x = 'Année de naissance',
-       y = 'Nombre de\nparlementaires',
-       fill = 'Genre')
+manual_measures <- read_csv('proto/formants.csv') %>% 
+  filter(time.rel == 0.5) %>% 
+  rename_with(.fn = ~ str_to_upper(.x) %>% paste0('_man'), .cols = c(f1, f2, f3))
 
-yob_hist %>% 
-  ggsave('fig/yob_hist.png', ., device = 'png', width = 15.59, height = 5, units = 'cm')
+check_measures <- all_vowels %>% 
+  filter(time == 0.5) %>% 
+  select(c(discourse, speaker, phone, phone_begin, F1, F2, F3)) %>% 
+  rename_with(.fn = ~ str_to_upper(.x) %>% paste0('_auto'), .cols = c(F1, F2, F3)) %>% 
+  right_join(manual_measures, by = c('discourse', 'speaker', 'phone', 'phone_begin'))
+
+check_measures <- check_measures %>% 
+  mutate(phone = phone %>% fct_relevel(vowelset)) %>% 
+  arrange(phone)
+
+check_measures <- check_measures %>% 
+  mutate(F1_diff = F1_auto - F1_man,
+         F2_diff = F2_auto - F2_man,
+         F3_diff = F3_auto - F3_man)
+
+check_measures_long <- check_measures %>%
+  select(speaker, phone, F1_man, F2_man, F3_man, F1_auto, F2_auto, F3_auto) %>%
+  pivot_longer(cols = F1_man:F3_auto,
+               names_to = c('formant', '.value'),
+               names_sep = '_')
+
+check_plot <- check_measures_long %>% 
+  ggplot(aes(x = man, y = auto)) +
+  geom_abline(slope = 1, colour = 'red') +
+  geom_point(alpha = 0.2, size = 0.4) +
+  facet_wrap(~formant,
+             scales = 'free',
+             ncol = 1,
+             strip.position = 'right') +
+  labs(x = 'Mesure manuelle (Hz)',
+       y = 'Mesure automatique (Hz)') +
+  theme(strip.text = element_blank())
+
+diff_plot <- check_measures_long %>% 
+  mutate(diff.abs = abs(auto - man)) %>% 
+  left_join(data.frame('formant' = c('F1', 'F2', 'F3'), ref_error = c(10, 20, NA))) %>% 
+  ggplot(aes(x = phone, y = diff.abs)) +
+  stat_summary(fun.data = iqr, size = 0.1) +
+  geom_hline(aes(yintercept = ref_error), lty = 'dashed', linewidth = 0.75, colour = 'red') +
+  facet_wrap(~formant, scales = 'free', ncol = 1, strip.position = 'right') +
+  labs(x = 'Voyelle',
+       y = 'Différence absolue (Hz)')
+
+valid <- check_plot + diff_plot
+
+valid %>% 
+  ggsave('fig/valid.png', ., device = 'png', width = 15.59, height = 12, units = 'cm')
 
 
-# Acoustics table ---------------------------------------------------------
+# Figure 4 ----------------------------------------------------------------
 
-vowelset <- c('i', 'e', 'ɛ', 'ɛ\U0303', 'ɜ', 'a', 'y', 'ø', 'ə', 'œ', 'œ\U0303', 'u', 'o', 'ɔ', 'ɔ\U0303', 'ɑ', 'ɑ\U0303')
-
-all_vowels <- read_csv('extract/ParlBleu_vowels.csv')
+# Préparation des données
+vowelset <- c('i', 'e', 'ɛ', 'ɜ', 'a', 'y', 'ø', 'ə', 'œ', 'u', 'o', 'ɔ', 'ɑ', 'ɛ\U0303', 'œ\U0303', 'ɔ\U0303', 'ɑ\U0303')
 
 vowels <- all_vowels %>% 
   filter(phone %in% vowelset,
@@ -145,126 +152,204 @@ vowels <- all_vowels %>%
   mutate(phone = phone %>% fct_relevel(vowelset),
          speaker = speaker %>% as.character)
 
-vowels <- vowels %>% 
+lax_sub <- c('i' = 'ɪ',
+             'y' = 'ʏ',
+             'u' = 'ʊ')
+
+vowels_finalsyll <- vowels %>% 
+  filter(syllable_end == word_end) %>% 
+  mutate(allophone = case_when((!phone %in% c('ɛ\U0303', 'œ\U0303', 'ɔ\U0303', 'ɑ\U0303', 'ɑ', 'ɜ', 'ɛ', 'o', 'ø')) &
+                                 (following_phone %in% c('v', 'z', 'ʒ', 'ʁ')) &
+                                 (transcription %>% str_detect('[vzʒʁ]$|v\\.ʁ$')) &
+                                 (phone_end != syllable_end) ~ paste0(phone, 'ː'),
+                               (phone == 'ɑ') & (phone_end == word_end) ~ 'ɑ',
+                               (phone %in% c('i', 'y', 'u')) &
+                                 (phone_end != syllable_end) ~ str_replace_all(phone, lax_sub),
+                               (phone %in% c('o', 'ø', 'ɑ')) &
+                                 (phone_end != syllable_end) ~ paste0(phone, 'ː'),
+                               TRUE ~ phone),
+         length = case_when(allophone %>% str_detect('[ːɜ]') ~ 'long',
+                            allophone %>% str_detect('\U0303') ~ 'nasal',
+                            TRUE ~ 'short') %>% as.factor() %>% fct_relevel(c('short', 'long', 'nasal'))) %>% 
+  filter(!allophone %in% c('eː', 'əː', 'ʊː'))
+
+allophone_set <- c('i', 'iː', 'ɪ', 'e', 'ɛ', 'ɜ', 'a', 'aː', 'y', 'yː', 'ʏ', 'ø', 'øː', 'ə', 'œ', 'œː', 'u', 'uː', 'ʊ', 'o', 'oː', 'ɔ', 'ɔː', 'ɑ', 'ɑː', 'ɛ\U0303', 'œ\U0303', 'ɔ\U0303', 'ɑ\U0303')
+
+vowels_finalsyll <- vowels_finalsyll %>% 
+  mutate(allophone = allophone %>% fct_relevel(allophone_set))
+
+vowels_finalsyll <- vowels_finalsyll %>% 
   left_join(bios,
             by = c('speaker' = 'id')) %>% 
   filter(lieu == 'Québec')
 
-vowels_for_dur <- all_vowels %>%
-  filter(phone %in% vowelset) %>% 
-  mutate(phone = phone %>% fct_relevel(vowelset),
-         speaker = speaker %>% as.character) %>% 
-  left_join(bios,
-            by = c('speaker' = 'id')) %>% 
-  filter(lieu == 'Québec')
-
-
-# Create datasets with mean and sd calculations
-speaker_means <- vowels %>% 
+speaker_means <- vowels_finalsyll %>% 
   summarize(across(F1:F3,
                    ~ mean(.x, na.rm = TRUE)),
-            .by = c(time, phone, word, speaker, genre)) %>% 
+            .by = c(time, allophone, word, speaker, genre, length)) %>% 
   summarize(across(F1:F3,
                    ~ mean(.x, na.rm = TRUE)),
-            .by = c(time, phone, speaker, genre))
+            .by = c(time, allophone, speaker, genre, length))
 
 gender_means <- speaker_means %>% 
   summarize(across(F1:F3,
                    c('mean' = ~ mean(.x, na.rm = TRUE),
                      'sd' = ~ sd(.x, na.rm = TRUE))),
-            .by = c(time, phone, genre))
+            .by = c(time, allophone, genre, length))
 
-# pop_means <- speaker_means %>% 
-#   summarize(across(F1:F3,
-#                    c('mean' = ~ mean(.x, na.rm = TRUE),
-#                      'sd' = ~ sd(.x, na.rm = TRUE))),
-#             .by = c(time, phone))
+# Espace vocalique
 
-# Same, but for duration measures
-speaker_dur_means <- vowels_for_dur %>% 
-  mutate(duration = phone_duration * 1000) %>% 
-  select(-phone_duration) %>% 
-  summarize(across(c(duration),
-                   ~ mean(.x, na.rm = TRUE)),
-            .by = c(phone, word, speaker, genre)) %>% 
-  summarize(across(c(duration),
-                   ~ mean(.x, na.rm = TRUE)),
-            .by = c(phone, speaker, genre))
-
-gender_dur_means <- speaker_dur_means %>% 
-  summarize(across(c(duration),
-                   c('mean' = ~ mean(.x, na.rm = TRUE),
-                     'sd' = ~ sd(.x, na.rm = TRUE))),
-            .by = c(phone, genre))
-
-# Create the single table, pivot wider
-acoustics_summary <- gender_means %>% 
-  filter(time == 0.5) %>% 
-  left_join(gender_dur_means, by = c('phone', 'genre')) %>% 
-  select(-time) %>% 
-  arrange(phone, genre) %>%
-  pivot_longer(cols = c(F1_mean:duration_sd),
-               names_to = c('.value', 'statistic'),
-               names_sep = '_') %>% 
-  pivot_wider(names_from = genre,
-             values_from = c(F1:duration)) %>% 
-  pivot_wider(names_from = statistic,
-              values_from = F1_f:duration_m)
-
-acoustics_summary %>% 
-  gt() %>% 
-  fmt_number(decimals = 0) %>% 
-  cols_merge(columns = starts_with('F1_f'),
-             pattern = '{1}\n({2})') %>% 
-  cols_merge(columns = starts_with('F1_m'),
-           pattern = '{1}\n({2})')
+dummy <- rbind(gender_means %>% 
+                 summarize(F1_mean = min(F1_mean) - 0.5 * sd(F1_mean),
+                           F2_mean = min(F2_mean) - 0.5 * sd(F2_mean),
+                           F3_mean = min(F3_mean) - 0.5 * sd(F3_mean),
+                           allophone = NA,
+                           .by = c(genre, time)),
+               gender_means %>% 
+                 summarize(F1_mean = max(F1_mean) + 0.9 * sd(F1_mean),
+                           F2_mean = max(F2_mean) + 0.7 * sd(F2_mean),
+                           F3_mean = max(F3_mean) + 0.5 * sd(F3_mean),
+                           allophone = NA,
+                           .by = c(genre, time))) %>% 
+  filter(time == 0.5)
 
 
-# Vowel plots -------------------------------------------------------------
-  
-# By-gender vowel spaces
-mid_f1xf2 <- gender_means %>% 
-  filter(time == 0.5) %>% 
-  ggplot(aes(x = F2_mean, y = F1_mean, colour = phone)) +
-  stat_ellipse(data = speaker_means %>% filter(time == 0.5),
+f1xf2_short <- gender_means %>% 
+  filter(length == 'short', time == 0.5) %>% 
+  ggplot(aes(x = F2_mean, y = F1_mean, colour = allophone)) +
+  stat_ellipse(data = speaker_means %>% filter(length == 'short', time == 0.5),
                aes(x = F2, y = F1), level = 0.68, alpha = 0.25) +
-  geom_text(aes(label = phone), size = 4) +
+  geom_text(aes(label = allophone), size = 3.5) +
   scale_x_reverse() +
   scale_y_reverse() +
   labs(x = 'F2 (Hz)',
        y = 'F1 (Hz)') +
   theme(legend.position = 'none') +
-  facet_wrap(~genre,
+  geom_blank(data = dummy) +
+  facet_wrap(~ genre,
              scales = 'free',
-             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller())
+             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller(),
+             ncol = 1,
+             strip.position = 'right') +
+  theme(strip.text = element_blank())
 
-mid_f1xf2 %>% 
-  ggsave('fig/midf1xf2.png', ., device = 'png', width = 15.59, height = 8, units = 'cm')
-
-gender_means %>% 
-  filter(time >= 0.25 & time <= 0.75) %>% 
-  ggplot(aes(x = F2_mean, y = F1_mean, colour = phone)) +
-  geom_path(arrow = arrow(length = unit(0.25, 'cm'), type = 'closed')) +
+f1xf2_long <- gender_means %>% 
+  filter(length == 'long', time == 0.5) %>% 
+  ggplot(aes(x = F2_mean, y = F1_mean, colour = allophone)) +
+  stat_ellipse(data = speaker_means %>% filter(length == 'long', time == 0.5),
+               aes(x = F2, y = F1), level = 0.68, alpha = 0.25) +
+  geom_text(aes(label = allophone), size = 3.5) +
   scale_x_reverse() +
   scale_y_reverse() +
   labs(x = 'F2 (Hz)',
        y = 'F1 (Hz)') +
   theme(legend.position = 'none') +
-  facet_wrap(~genre,
+  geom_blank(data = dummy) +
+  facet_wrap(~ genre,
              scales = 'free',
-             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller())
+             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller(),
+             ncol = 1,
+             strip.position = 'right') +
+  theme(strip.text = element_blank())
 
-mid_f3 <- gender_means %>% 
+f1xf2_nasal <- gender_means %>% 
+  filter(length == 'nasal', time == 0.5) %>% 
+  ggplot(aes(x = F2_mean, y = F1_mean, colour = allophone)) +
+  stat_ellipse(data = speaker_means %>% filter(length == 'nasal', time == 0.5),
+               aes(x = F2, y = F1), level = 0.68, alpha = 0.25) +
+  geom_text(aes(label = allophone), size = 3.5) +
+  scale_x_reverse() +
+  scale_y_reverse() +
+  labs(x = 'F2 (Hz)',
+       y = 'F1 (Hz)') +
+  theme(legend.position = 'none') +
+  geom_blank(data = dummy) +
+  facet_wrap(~ genre,
+             scales = 'free',
+             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller(),
+             ncol = 1,
+             strip.position = 'right')
+
+f1xf2 <- (f1xf2_short + f1xf2_long + f1xf2_nasal) +
+  plot_layout(axes = 'collect')
+
+f1xf2 %>% 
+  ggsave('fig/f1xf2.png', ., device = 'png', width = 15.59, height = 10, units = 'cm')
+
+
+f3 <- gender_means %>% 
   filter(time == 0.5) %>% 
-  ggplot(aes(x = phone, y = F3_mean, colour = phone)) +
+  ggplot(aes(x = allophone, y = F3_mean, colour = allophone)) +
   geom_pointrange(aes(ymin = F3_mean - F3_sd,
-                      ymax = F3_mean + F3_sd)) +
+                      ymax = F3_mean + F3_sd),
+                  size = 0.25) +
   theme(legend.position = 'none') +
-  labs(x = element_blank(),
+  labs(x = 'Voyelle',
        y = 'F3 (Hz)') +
-  facet_wrap(~genre,
+  facet_wrap(~ genre,
              scales = 'free',
-             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller())
+             labeller = c('f' = 'Femmes', 'm' = 'Hommes') %>% as_labeller(),
+             ncol = 1,
+             strip.position = 'right')
 
-mid_f3 %>% 
-  ggsave('fig/midf3.png', ., device = 'png', width = 15.59, height = 8, units = 'cm')
+f3 %>% 
+  ggsave('fig/f3.png', ., device = 'png', width = 15.59, height = 10, units = 'cm')
+
+
+# Table 1 -----------------------------------------------------------------
+
+old_data <- read_csv('extract/AssNat_speech_breakdown.csv') %>% 
+  rename(old_data = duration) %>% 
+  filter(speaker != '010') # Non-native speaker with < 2s of data, none of which was successfully aligned
+
+new_data <- read_csv('extract/exp_speech_breakdown.csv') %>% 
+  rename(new_data = duration) %>% 
+  mutate(speaker = speaker %>% as.character())
+
+ids <- read_csv('meta/id.csv') %>% 
+  mutate(id_original = id_original %>% { if_else(is.na(.), NA, sprintf('%03d', .)) } )
+
+old_data <- old_data %>% 
+  left_join(ids, by = c('speaker' = 'id_original')) %>% 
+  summarize(old_data = sum(old_data),
+            .by = id) %>% 
+  mutate(id = id %>% as.character())
+
+data_duration <- old_data %>% 
+  full_join(new_data,
+            by = c('id' = 'speaker'))
+
+data_duration <- data_duration %>% 
+  left_join(bios, by = 'id') %>% 
+  select(-c(`prénom`:nom_complet))
+
+data_duration <- data_duration %>% 
+  relocate(old_data:new_data, .after = everything())
+
+data_duration <- data_duration %>% 
+  arrange(is.na(old_data), annee_naissance, genre)
+
+speaker_table <- data_duration %>% 
+  select(-région) %>% 
+  gt(rowname_col = 'id') %>% 
+  tab_stubhead(label = 'Locutaire (code)') %>% 
+  cols_label(genre = 'Genre',
+             annee_naissance = 'Année de naissance',
+             municipalité = 'Lieu de naissance',
+             old_data = 'Corpus original',
+             new_data = 'Expansion') %>% 
+  tab_spanner(label = 'Quantité de données', columns = c(old_data, new_data)) %>% 
+  fmt(columns = genre, fns = toupper) %>% 
+  fmt_duration(columns = c(old_data, new_data), input_units = 'seconds', output_units = c('hours', 'minutes')) %>% 
+  grand_summary_rows(columns = c(old_data, new_data),
+                     fns = Total ~ sum(., na.rm = TRUE),
+                     missing_text = '',
+                     fmt = ~ fmt_duration(., input_units = 'seconds', output_units = c('hours', 'minutes'))) %>% 
+  cols_merge(columns = c(municipalité, lieu),
+             pattern = '{1} ({2})') %>% 
+  sub_missing(columns = c(annee_naissance, municipalité), missing_text = '?') %>% 
+  sub_missing(columns = c(old_data, new_data), missing_text = '—') %>% 
+  cols_align(columns = c(id, genre, annee_naissance), align = 'center')
+
+speaker_table %>% 
+  gtsave('./etc/figs/speakers.docx')
