@@ -41,11 +41,18 @@ mna %>%
 # 2024-04-02 Addition: Replace 'Saint'(e) at the beginning of a string with
 # 'St'(e). Currently not very safe, but tested and OK for existing names. 
 
+# 2025-09-02 Change: Made algorithm produce same results on macOS as on Windows:
+# macOS adds characters for accents rather than just removing them. Apostrophes
+# need special handling, since these can appear in names.
+
 # Define a function to get rid of accents and make everything the same case
 sameify <- function(string) {
   string %>% 
+    str_replace_all("'", '0') %>% # temporary, will be restored later
     iconv(from = 'UTF-8', to = 'ASCII//TRANSLIT') %>% 
     str_replace('^Saint', 'St') %>% 
+    str_remove_all("['`^]") %>% 
+    str_replace_all('0', "'") %>% 
     str_to_lower()
 }
 
@@ -75,7 +82,7 @@ original_ids <- read_csv('./meta/original/SpeakerList_fixed.csv', col_names = c(
   mutate(name = paste(first, last), .after = last)
 
 mna_original_id <- mna_unique_id %>%
-  left_join(original_ids %>% select(name, id_original), by = c('nom_complet' = 'name')) %>% 
+  left_join(original_ids %>% select(name, id_original), by = c('nom_complet' = 'name'))%>% 
   arrange(nom %>% sameify(), prénom %>% sameify(), nom, prénom)
 
 # Save as CSV
@@ -88,7 +95,7 @@ mna_original_id %>% write_csv('./meta/id.csv', na = '')
 mna_temp <- mna_unique_id %>% 
   arrange(nom %>% sameify(), prénom %>% sameify(), nom, prénom) %>% 
   mutate(genre = NA,
-         annee_naissance = NA,
+         année_naissance = NA,
          municipalité = NA,
          lieu = NA,
          code = NA)
