@@ -107,7 +107,7 @@ mna_temp %>% write_csv('./meta/bios_temp.csv', na = '')
 # Add geographic information ----------------------------------------------
 
 # Read in bios file
-bios <- read_csv('./meta/bios_man.csv')
+bios <- read_csv('./meta/bio_info.csv')
 
 # Get list of unique locations
 locales <- bios %>% 
@@ -132,14 +132,10 @@ locales_osm <- locales %>%
           lat = 'lat_fallback',
           long = 'long_fallback')
 
-use_fallback <- c('Jonquière',
-                  'Laterrière',
-                  'Buckingham',
-                  'Quyon',
-                  'Duparquet',
-                  'Évain',
-                  'Taschereau',
-                  'La Sarre')
+check_osm <- locales_osm %>% 
+  filter(lat != lat_fallback | long != long_fallback)
+
+use_fallback <- c()
 
 locales_osm_cleaned <- locales_osm %>% 
   mutate(lat = case_when(
