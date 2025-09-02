@@ -23,6 +23,7 @@ for (legislature in legislatures){
 mna %>% 
   write_csv('./meta/legislatures.csv', na = '')
 
+
 # Create unique, anonymous speaker IDs ------------------------------------
 
 # This algorithm is designed to be infinitely extensible as new MNAs enter 
@@ -161,46 +162,8 @@ mna_bios <- mna_unique_id %>%
   arrange(nom %>% sameify(),
           prénom %>% sameify(),
           nom,
-          prénom)
+          prénom) %>% 
+  rename(ID_column = id) %>% 
+  select(-(prénom:nom_complet))
 
 mna_bios %>% write_csv('./meta/bios.csv', na = '')
-
-
-mna_bios_locales <- mna_bios %>% 
-  left_join(locales_osm_cleaned, by = c('municipalité', 'région', 'lieu'))
-
-mna_bios_locales %>% write_csv('./meta/bios_loc.csv', na = '')
-
-
-# Create a version compatible with PGDB for current corpus version --------
-
-mna_bios_pgdb <- mna_bios %>% 
-  relocate(ID_column = id)
-  
-mna_bios_pgdb %>% write_csv('./meta/bios_pgdb.csv', na = '')
-
-
-# Sanity checks -----------------------------------------------------------
-
-# For manual inspection of MNA list, check that there are no homonyms
-mna_list_check <- mna %>% 
-  arrange(nom %>% sameify())
-
-# Check that no ridings are spelled in two different ways
-riding_check <- mna$circonscription %>%
-  unique() %>% 
-  sort()
-
-# Check that each legislature begins with the correct number of people (125,
-# unless particular circumstances prevent it)
-legislature_check <- mna %>% 
-  count(du)
-
-# Check for disagreement between Nominatim calls
-locales_check <- locales_osm %>% 
-  filter(lat != lat_fallback | long != long_fallback | is.na(lat) | is.na(long))
-
-# Plot all locales with names
-locales_osm_cleaned %>% 
-  ggplot(aes(x = long, y = lat, label = municipalité)) +
-  geom_label(size = 2)
