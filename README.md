@@ -6,7 +6,7 @@ A corpus of spoken Quebec French created from parliamentary speech (data from th
 
 ### How to use
 
-The latest release of the corpus (v1.0.0) is hosted [on OSF](osf.io/35fk8), and can be found in the `v1_0_0` directory: this includes all aligned TextGrids and associated WAV files.
+The latest release of the corpus (v1.0.0) is hosted [on OSF](https://osf.io/35fk8), and can be found in the `v1_0_0` directory: this includes all aligned TextGrids and associated WAV files.
 
 The [GitHub repository](https://github.com/massimolipari/Corpus_ParlBleu) contains speaker metadata (in the `meta` directory), which can be used to conduct sociolinguistic or dialectological analyses. It also contains all the scripts used to go from the raw files downloaded from the National Assembly website to the release version.
 
@@ -29,7 +29,7 @@ Un corpus oral de français québécois constitué à partir de données parleme
 
 ### Comment l'utiliser
 
-La dernière version du corpus (v1.0.0) est distribuée [sur OSF](osf.io/35fk8), dans le dossier `v1_0_0`: on y trouvera tous les fichiers TextGrid contenant les transcriptions alignées ainsi que les ficihiers WAV associés.
+La dernière version du corpus (v1.0.0) est distribuée [sur OSF](https://osf.io/35fk8), dans le dossier `v1_0_0`: on y trouvera tous les fichiers TextGrid contenant les transcriptions alignées ainsi que les ficihiers WAV associés.
 
 Le [référentiel GitHub](https://github.com/massimolipari/Corpus_ParlBleu) renferme les métadonnées sur les parlementaires (dans le dossier `meta`), permettant d'effectuer des analyses sociolinguistiques ou dialectologiques. On y trouvera également les scripts qui ont été utilisés pour créer la version distribuée à partir des fichiers téléchargés du site web de l'Assemblée.
 
