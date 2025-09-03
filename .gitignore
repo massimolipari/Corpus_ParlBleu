@@ -7,8 +7,11 @@
 **segm
 corpus/exp
 **/*.wav
-proto/male
-proto/female
+proto/female/*
+proto/male/*
+!proto/female/winners.csv
+!proto/male/winners.csv
+
 LFDI 9
 extract
 
