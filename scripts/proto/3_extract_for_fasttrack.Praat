@@ -1,6 +1,6 @@
-root_dir$ = "../align/"
-sample_path$ = "../proto/vowels_sample_checked.csv"
-output_root$ = "../proto/"
+root_dir$ = "../../align/"
+sample_path$ = "../../proto/vowels_sample_checked.csv"
+output_root$ = "../../proto/"
 
 buffer = 0.027
 
