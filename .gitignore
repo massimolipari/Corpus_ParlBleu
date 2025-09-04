@@ -1,18 +1,10 @@
 **/.DS_Store
 **/.Rhistory
 **/.Rdata
+.Rproj.user
 
-**/long
-**/vid
-**segm
-corpus/exp
-**/*.wav
-proto/female/*
-proto/male/*
-!proto/female/winners.csv
-!proto/male/winners.csv
-
+align
+corpus
 LFDI 9
 extract
 
-.Rproj.user
